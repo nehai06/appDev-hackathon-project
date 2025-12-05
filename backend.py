@@ -11,7 +11,6 @@ import jwt
 import os
 import random
 import string
-import math
 
 # --- Configuration & Initialization ---
 
@@ -40,7 +39,7 @@ db = client["fantasy_life_league"]
 # Collections
 users_collection = db["users"]
 leagues_collection = db["leagues"]
-matchups_collection = db["matchups"]
+matchups_collection = db["matchups"] 
 habit_entries_collection = db["habit_entries"]
 
 # Security
