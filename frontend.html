@@ -1712,6 +1712,8 @@
       weekPoints: 0,
       daysLogged: 0,
       streak: 0,
+      lastLogDate:null,
+      todayPoints:0,
       league: {
         name: 'Fantasy Life League',
         code: 'FLL2025',
@@ -1732,6 +1734,20 @@
       if (saved) {
         state = { ...state, ...JSON.parse(saved) };
       }
+      
+      // check if streak should be reset
+      if (state.lastLogDate) {
+        const lastLog = new Date(state.lastLogDate);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        lastLog.setHours(0, 0, 0, 0);
+
+        const daysDiff = Math.floor((today - lastLog) / (1000 * 60 * 60 * 24));
+        if (daysDiff > 1) {
+          state.streak = 0;
+        }
+      }
+      
       // Initialize players if empty
       if (state.league.players.length === 0) {
         state.league.players = [
@@ -1782,6 +1798,9 @@
 
     // Log habits
     function logHabits() {
+      const today = new Date().toISOString().split('T')[0]; 
+      const alreadyLoggedToday = state.lastLogDate === today;
+
       const habits = {
         sleep: document.getElementById('sleep').value,
         study: document.getElementById('study').value,
@@ -1791,35 +1810,61 @@
         mindfulness: document.getElementById('mindfulness').value,
         screentime: document.getElementById('screentime').value
       };
-      
-      // Check if any value entered
-      if (!Object.values(habits).some(v => v)) {
-        showToast('Please enter at least one habit!', true);
-        return;
-      }
-      
-      const points = calculatePoints(habits);
-      state.habits = habits;
-      state.weekPoints += points;
-      state.daysLogged = Math.min(7, state.daysLogged + 1);
-      state.streak++;
-      state.matchup.userScore += points;
-      
-      // Update user in league
-      const userPlayer = state.league.players.find(p => p.isUser);
-      if (userPlayer) {
-        userPlayer.weekPts = state.matchup.userScore;
-        userPlayer.points += points;
-      }
-      
-      // Show coach tip
-      showCoachTip(habits);
-      
-      saveState();
-      updateUI();
-      showToast(`Habits logged! +${points} points`, false, points);
-    }
 
+      //check if value entered
+      if (!Object.values(habits).some(v => v)) {
+        showToast('Enter at least one habit!', true);
+      return;
+      }
+
+      const newPoints = calculatePoints(habits);
+
+      if (alreadyLoggedToday) {
+        const oldPoints = state.todayPoints || 0;
+        const pointsDiff = newPoints - oldPoints;
+    
+        state.habits = habits;
+        state.todayPoints = newPoints;
+        state.weekPoints += pointsDiff;
+        state.matchup.userScore += pointsDiff;
+      
+        //update user in league
+        const userPlayer = state.league.players.find(p => p.isUser);
+        if (userPlayer) {
+          userPlayer.weekPts = state.matchup.userScore;
+          userPlayer.points += pointsDiff;
+        }
+
+        showCoachTip(habits);
+        
+        saveState();
+        updateUI();
+        showToast(`Habits updated! ${pointsDiff >= 0 ? '+' : ''}${pointsDiff.toFixed(1)} points`, false, newPoints);
+      } else { 
+        //new entry for today
+        state.habits = habits;
+        state.todayPoints = newPoints;
+        state.weekPoints += newPoints;
+        state.daysLogged = Math.min(7, state.daysLogged + 1);
+        state.streak++;
+        state.matchup.userScore += newPoints;
+        state.lastLogDate = today;
+
+        //update user in league
+        const userPlayer = state.league.players.find(p => p.isUser);
+        if (userPlayer) {
+          userPlayer.weekPts = state.matchup.userScore;
+          userPlayer.points += newPoints;
+        }
+
+        showCoachTip(habits);
+    
+        saveState();
+        updateUI();
+        showToast(`Habits logged! +${newPoints.toFixed(1)} points`, false, newPoints);
+      }
+    }
+    
     // Show coach tip based on habits
     function showCoachTip(habits) {
       const tips = {
@@ -1892,6 +1937,15 @@
 
     // Update all UI elements
     function updateUI() {
+      // Update based on whether already logged today
+      const today = new Date().toISOString().split('T')[0];
+      const logButton = document.querySelector('.submit-btn');
+      if (state.lastLogDate === today) {
+        logButton.innerHTML = 'Update Today\'s Habits';
+      } else {
+        logButton.innerHTML = 'Log Habits';
+      }
+      
       // User name
       document.getElementById('userName').textContent = state.user.name;
       document.getElementById('welcomeName').textContent = state.user.name.split(' ')[0];
